@@ -1,0 +1,5 @@
+- free         : Dapat cash RM100 sekali
+- dice <bet>   : Main dadu melawan NPC, menang/kalah rawak
+- reset        : Reset cash & boleh claim free semula
+- tag <nama>   : Tukar nama tag (default: 000)
+- help         : Tunjuk senarai arahan`)
