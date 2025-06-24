@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>zxvwp dice</title>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+  <style>
+    body {
+      background: black;
+      color: lime;
+      font-family: monospace;
+      margin: 0;
+      padding: 0;
+    }
+    .sticky-bar {
+      background: #111;
+      color: yellow;
+      padding: 10px;
+      border-bottom: 1px solid lime;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #terminal {
+      padding: 10px;
+      height: 80vh;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    #command {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      outline: none;
+      background: #222;
+      color: lime;
+      font-family: monospace;
+      font-size: 1em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sticky-bar" id="profile">
+    | tag : 000 | cash : 0 |
+  </div>
+
+  <div id="terminal">
+    Loading game...
+  </div>
+
+  <input type="text" id="command" placeholder="Taip command dan tekan Enter"/>
+
+  <script>
+    // Setup Dexie DB
+    const db = new Dexie("CliGameDB");
+    db.version(1).stores({
+      profile: "&id, tag, cash, claimedFree"
+    });
+
+    let profile = {
+      id: 1,
+      tag: "000",  // default tag
+      cash: 0,
+      claimedFree: false
+    };
+
+    const terminal = document.getElementById('terminal');
+    const commandInput = document.getElementById('command');
+    const profileBar = document.getElementById('profile');
+
+    function updateProfileBar() {
+      profileBar.textContent = `| tag : ${profile.tag} | cash : ${profile.cash} |`;
+    }
+
+    function appendTerminal(text) {
+      terminal.innerText += '\n> ' + text;
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    async function saveProfile() {
+      await db.profile.put(profile);
+    }
+
+    async function loadProfile() {
+      const saved = await db.profile.get(1);
+      if (saved) {
+        profile = saved;
+        appendTerminal("Data dimuat dari simpanan.");
+      } else {
+        await db.profile.put(profile);
+        appendTerminal("Data baru dicipta.");
+      }
+      updateProfileBar();
+    }
+
+    // Function to simulate rolling dice
+    function rollDice() {
+      return Math.floor(Math.random() * 6) + 1;
+    }
+
+    async function processCommand(input) {
+      const parts = input.trim().split(" ");
+      const cmd = parts[0].toLowerCase();
+
+      if (cmd === "free") {
+        if (profile.claimedFree) {
+          appendTerminal("Kau dah claim cash free.");
+        } else {
+          profile.cash += 100;
+          profile.claimedFree = true;
+          appendTerminal("Kau dapat RM100!");
+        }
+
+      } else if (cmd === "dice") {
+        const bet = parseInt(parts[1]);
+        if (isNaN(bet) || bet <= 0) {
+          appendTerminal("Salah format. Guna: dice <bet>");
+        } else if (profile.cash < bet) {
+          appendTerminal("Cash tak cukup. Topup la dulu.");
+        } else {
+          appendTerminal("Bertaruh... Menunggu NPC...");
+          
+          // NPC betting
+          const npcBet = Math.floor(Math.random() * 100) + 1;
+          appendTerminal(`NPC bertaruh RM${npcBet}.`);
+
+          // Rolling dice
+          const playerRoll = rollDice();
+          const npcRoll = rollDice();
+          
+          appendTerminal(`Kau roll: ${playerRoll}`);
+          appendTerminal(`NPC roll: ${npcRoll}`);
+
+          if (playerRoll > npcRoll) {
+            profile.cash += bet;
+            appendTerminal(`MENANG! Kau dapat RM${bet}`);
+          } else if (playerRoll < npcRoll) {
+            profile.cash -= bet;
+            appendTerminal(`KALAH! Kau rugi RM${bet}`);
+          } else {
+            appendTerminal("SERI! Tiada siapa menang.");
+          }
+        }
+
+      } else if (cmd === "help") {
+        appendTerminal(`Senarai command:
+- free         : Dapat cash RM100 sekali
+- dice <bet>   : Main dadu melawan NPC, menang/kalah rawak
+- reset        : Reset cash & boleh claim free semula
+- tag <nama>   : Tukar nama tag (default: 000)
+- help         : Tunjuk senarai arahan`);
+
+      } else if (cmd === "reset") {
+        profile.cash = 0;
+        profile.claimedFree = false;
+        appendTerminal("Cash telah di-reset ke 0. Kau boleh claim free semula.");
+
+      } else if (cmd === "tag") {
+        const newTag = parts[1];
+        if (!newTag || newTag.length === 0) {
+          appendTerminal("Nama tag tak sah. Sila masukkan nama.");
+        } else {
+          profile.tag = newTag;
+          appendTerminal(`Tag baru telah ditetapkan kepada: ${profile.tag}`);
+        }
+
+      } else {
+        appendTerminal("Command tak dikenali. Guna 'help' untuk senarai.");
+      }
+
+      updateProfileBar();
+      await saveProfile();
+    }
+
+    commandInput.addEventListener("keydown", function(e) {
+      if (e.key === "Enter") {
+        const input = commandInput.value;
+        commandInput.value = "";
+        processCommand(input);
+      }
+    });
+
+    loadProfile();
+  </script>
+</body>
+</html>
